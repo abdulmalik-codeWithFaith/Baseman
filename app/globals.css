@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------
+   Design tokens — locked palette
+   Generates utilities like bg-brand, text-muted,
+   border-border, text-success, etc.
+--------------------------------------------- */
+@theme {
+  --color-bg: #ffffff;
+  --color-ink: #111827; /* primary text */
+  --color-muted: #6b7280; /* secondary text */
+  --color-brand: #2563eb; /* primary accent */
+  --color-brand-light: #eff6ff; /* light accent bg */
+  --color-border: #e5e7eb;
+  --color-success: #16a34a;
+  --color-warning: #f59e0b;
+  --color-error: #dc2626;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    sans-serif;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+
+  /* Respect reduced motion preferences */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Visible keyboard focus everywhere */
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+}
