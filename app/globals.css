@@ -1,22 +1,25 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------
-   Design tokens — locked palette
-   Generates utilities like bg-brand, text-muted,
-   border-border, text-success, etc.
+   Design tokens
+   Brand color updated to deep teal (#134544),
+   used as a real solid background on alternating
+   sections — not just a light tint.
 --------------------------------------------- */
 @theme {
   --color-bg: #ffffff;
   --color-ink: #111827; /* primary text */
   --color-muted: #6b7280; /* secondary text */
-  --color-brand: #2563eb; /* primary accent */
-  --color-brand-light: #eff6ff; /* light accent bg */
+  --color-brand: #134544; /* primary accent + dark section background */
+  --color-brand-light: #e7efee; /* light tint, for badges/icon chips on white */
   --color-border: #e5e7eb;
   --color-success: #16a34a;
   --color-warning: #f59e0b;
   --color-error: #dc2626;
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    sans-serif;
+  --font-display: var(--font-space-grotesk), var(--font-inter), ui-sans-serif,
     sans-serif;
 }
 
@@ -35,11 +38,13 @@
     font-family: var(--font-sans);
   }
 
-  /* Respect reduced motion preferences */
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
+    *, *::before, *::after {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
@@ -47,7 +52,6 @@
     }
   }
 
-  /* Visible keyboard focus everywhere */
   :focus-visible {
     outline: 2px solid var(--color-brand);
     outline-offset: 2px;
