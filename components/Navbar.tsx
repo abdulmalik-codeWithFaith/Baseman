@@ -4,7 +4,7 @@ export default function NavBar(){
         <header className="border-b border-border bg-[#134544]">
             <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
             <a href="/" className="flex items-center gap-2.5">
-                <img src="/base.png" alt="logo" className="w-50"/>
+                <img src="/base.png" alt="logo" className="md:w-50 w-30"/>
             </a>
             <div className="hidden items-center gap-8 text-sm text-muted md:flex">
                 <a href="/jobs" className="hover:text-white text-white/80">Jobs</a>
