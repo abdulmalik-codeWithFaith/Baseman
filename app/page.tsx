@@ -126,7 +126,7 @@ export default function LandingPage() {
             </motion.p>
 
             <motion.div variants={fadeUp} custom={3} className="mt-8 flex flex-wrap items-center gap-4">
-              <a href="/signup" className="inline-flex items-center gap-2 rounded-lg bg-brand px-5 py-3 text-sm font-medium text-white hover:bg-brand/90 transition-colors">
+              <a href="/jobs" className="inline-flex items-center gap-2 rounded-lg bg-brand px-5 py-3 text-sm font-medium text-white hover:bg-brand/90 transition-colors">
                 Find Jobs <ArrowRight className="h-4 w-4" />
               </a>
               <a href="/employers" className="inline-flex items-center gap-2 rounded-lg border border-border px-5 py-3 text-sm font-medium text-ink hover:bg-brand-light transition-colors">

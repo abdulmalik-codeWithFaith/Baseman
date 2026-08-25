@@ -39,7 +39,7 @@ const employerLinks = [
 ];
 
 export default function NavBar() {
-  const [isLoggedIn, setIsLoggedIn] = useState(true); // TODO: replace with real auth state
+  const [isLoggedIn, setIsLoggedIn] = useState(false); // TODO: replace with real auth state
   const [role, setRole] = useState<Role>("seeker"); // TODO: derive from user session
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -105,7 +105,7 @@ export default function NavBar() {
                         </a>
                       ))}
                       <a
-                        href="/settings"
+                        href={role === "seeker" ? "/settings" : "/employers/settings"}
                         className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-ink hover:bg-brand-light transition-colors"
                       >
                         <Settings className="h-4 w-4 text-muted" />
