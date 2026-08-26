@@ -507,7 +507,7 @@ export default function LandingPage() {
             <h2 className="text-3xl font-bold tracking-tight text-white">Stop guessing. Start knowing.</h2>
             <p className="mx-auto mt-3 max-w-md text-white/70">Whether you're applying or hiring, Baseman replaces the guesswork with a real answer.</p>
             <div className="mt-7 flex flex-wrap items-center justify-center gap-4">
-              <a href="/signup" className="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3 text-sm font-medium text-brand hover:bg-white/90 transition-colors">
+              <a href="/jobs" className="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3 text-sm font-medium text-brand hover:bg-white/90 transition-colors">
                 Find Jobs <ArrowRight className="h-4 w-4" />
               </a>
               <a href="/employers" className="inline-flex items-center gap-2 rounded-lg border border-white/30 px-6 py-3 text-sm font-medium text-white hover:bg-white/10 transition-colors">
