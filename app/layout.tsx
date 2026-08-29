@@ -75,12 +75,16 @@ export const viewport: Viewport = {
   themeColor: "#134544",
 };
 
+import Providers from "@/components/Providers";
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`}>
-      <body className="bg-white text-ink antialiased">{children}</body>
+      <body className="bg-white text-ink antialiased">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

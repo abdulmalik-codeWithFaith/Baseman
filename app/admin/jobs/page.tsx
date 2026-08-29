@@ -133,7 +133,7 @@ export default function AdminJobsPage() {
                           <td className="px-4 py-3">
                             <div className="flex items-center justify-end gap-2">
                               {job.status !== "Draft" && (
-                                <a href={`/jobs/${job.id}`} className="flex h-7 w-7 items-center justify-center rounded-md text-muted hover:bg-brand-light hover:text-ink transition-colors" aria-label="View public listing">
+                                <a href={`/admin/jobs/${job.id}`} className="flex h-7 w-7 items-center justify-center rounded-md text-muted hover:bg-brand-light hover:text-ink transition-colors" aria-label="View job details">
                                   <Eye className="h-3.5 w-3.5" />
                                 </a>
                               )}

@@ -1,0 +1,276 @@
+// ---------------------------------------------------------------
+// Baseman database schema
+// Run: npx prisma migrate dev --name init
+// Then: npx prisma generate
+// ---------------------------------------------------------------
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// =================================================================
+// Auth (NextAuth.js — Prisma adapter shape)
+// =================================================================
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// =================================================================
+// Core enums
+// =================================================================
+
+enum UserRole {
+  SEEKER
+  EMPLOYER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum RemoteType {
+  REMOTE
+  HYBRID
+  ONSITE
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERNSHIP
+}
+
+enum ExperienceLevel {
+  ENTRY
+  MID
+  SENIOR
+}
+
+enum JobStatus {
+  ACTIVE
+  CLOSED
+  DRAFT
+  EXPIRED
+}
+
+enum ApplicationStatus {
+  APPLIED
+  INTERVIEW
+  OFFER
+  REJECTED
+  WITHDRAWN
+  AUTO_DECLINED
+}
+
+enum AiOperation {
+  JOB_MATCHING
+  RESUME_OPTIMIZATION
+  JOB_PARSING
+  INTERVIEW_GENERATION
+  INTERVIEW_EVALUATION
+}
+
+// =================================================================
+// Users
+// =================================================================
+
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  emailVerified DateTime?
+  passwordHash  String? // null for OAuth-only accounts
+  name          String
+  role          UserRole   @default(SEEKER)
+  status        UserStatus @default(ACTIVE)
+  image         String? // profile photo (seeker) — Cloudinary URL
+
+  createdAt    DateTime  @default(now())
+  lastActiveAt DateTime? @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+
+  // Role-specific profiles — only one will be populated depending on `role`
+  seekerProfile SeekerProfile?
+  company       Company? // employer's company, if role == EMPLOYER
+
+  applications Application[]
+  savedJobs    SavedJob[]
+  aiUsageLogs  AiUsageLog[]
+
+  @@index([role])
+  @@index([status])
+}
+
+model SeekerProfile {
+  id       String @id @default(cuid())
+  userId   String @unique
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title             String?
+  location          String?
+  bio               String?  @db.Text
+  skills            String[]
+  linkedinUrl       String?
+  githubUrl         String?
+  portfolioUrl      String?
+  preferredJobType  EmploymentType?
+  preferredRemote   RemoteType?
+
+  resumeUrl      String? // Cloudinary URL
+  resumeFileName String?
+
+  updatedAt DateTime @updatedAt
+}
+
+// =================================================================
+// Companies & jobs
+// =================================================================
+
+model Company {
+  id     String @id @default(cuid())
+  userId String @unique // the employer account that owns this company
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name         String
+  logoUrl      String? // Cloudinary URL
+  industry     String?
+  size         String?
+  website      String?
+  headquarters String?
+  description  String? @db.Text
+
+  jobs Job[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Job {
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  title            String
+  description      String   @db.Text
+  responsibilities String[]
+  requirements     String[]
+  skills           String[]
+  location         String
+  remote           RemoteType
+  employment       EmploymentType
+  experience       ExperienceLevel
+  salary           String?
+
+  status JobStatus @default(DRAFT)
+  views  Int       @default(0)
+
+  // AI auto-reject setting — the feature from /employers/post
+  autoReject         Boolean @default(false)
+  matchThreshold     Int     @default(50) // 0-100
+
+  applications Application[]
+  savedBy      SavedJob[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  closedAt  DateTime?
+
+  @@index([status])
+  @@index([companyId])
+}
+
+// =================================================================
+// Applications
+// =================================================================
+
+model Application {
+  id     String @id @default(cuid())
+  jobId  String
+  job    Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  resumeSnapshotUrl String? // resume as it was at time of application
+
+  match     Int? // 0-100, computed by the AI matching service
+  strengths String[]
+  gaps      String[]
+
+  status ApplicationStatus @default(APPLIED)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([jobId, userId]) // one application per seeker per job
+  @@index([userId])
+  @@index([jobId])
+  @@index([status])
+}
+
+model SavedJob {
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId  String
+  job    Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@id([userId, jobId])
+}
+
+// =================================================================
+// AI usage tracking (powers /admin/ai-usage)
+// =================================================================
+
+model AiUsageLog {
+  id        String      @id @default(cuid())
+  operation AiOperation
+  cost      Decimal     @db.Decimal(10, 6) // actual per-call cost from your provider
+  userId    String?
+  user      User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt DateTime    @default(now())
+
+  @@index([operation])
+  @@index([createdAt])
+}

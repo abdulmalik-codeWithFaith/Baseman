@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
@@ -10,14 +12,73 @@ import {
   Eye,
   EyeOff,
   CheckCircle2,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 
 type Role = "seeker" | "employer";
 
 export default function SignupPage() {
+  const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
   const [role, setRole] = useState<Role | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+
+  const [companyName, setCompanyName] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: fullName, email, password, role, companyName }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Something went wrong. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      // Account created — log them straight in
+      const result = await signIn("credentials", { email, password, redirect: false });
+      if (result?.error) {
+        setError("Account created, but login failed. Try logging in manually.");
+        setLoading(false);
+        return;
+      }
+
+      router.push(role === "employer" ? "/employers/dashboard" : "/dashboard");
+    } catch {
+      setError("Something went wrong. Please try again.");
+      setLoading(false);
+    }
+  };
+
+  const handleGoogle = () => {
+    // NOTE: Google sign-ins are always created as "Job seeker" (see the
+    // @default(SEEKER) on User.role in schema.prisma) — there's currently
+    // no way to pass the role picked in Step 1 through the OAuth redirect.
+    // An employer signing up with Google would need a follow-up "switch to
+    // employer" step after their first login. Flagging this as a known gap,
+    // not something silently working.
+    signIn("google", { callbackUrl: "/dashboard" });
+  };
 
   return (
     <main className="grid min-h-screen md:grid-cols-2">
@@ -28,22 +89,19 @@ export default function SignupPage() {
           alt="A job seeker reviewing opportunities with confidence"
           className="h-full w-full object-cover"
         />
-        {/* Photo: Jopwell via Pexels — pexels.com/photo/2422286, free commercial license */}
         <div className="absolute inset-0 bg-gradient-to-t from-brand via-brand/20 to-transparent" />
 
-        {/* Logo */}
         <a href="/" className="absolute left-8 top-8 flex items-center gap-2.5">
-          <img src="/base.png" alt="logo" className="w-50"/>
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-sm font-bold text-brand">B</span>
+          <span className="text-lg font-semibold tracking-tight text-white">Baseman</span>
         </a>
 
-        {/* Tagline */}
         <div className="absolute bottom-28 left-8 right-8">
           <p className="max-w-xs text-2xl font-bold leading-tight tracking-tight text-white">
             Know your fit before you apply — or before you post.
           </p>
         </div>
 
-        {/* Floating match card */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -70,21 +128,14 @@ export default function SignupPage() {
       {/* ---------------- Right: form panel ---------------- */}
       <div className="flex items-center justify-center px-6 py-16">
         <div className="w-full max-w-sm">
-          {/* Mobile logo (image hidden below md) */}
           <a href="/" className="mb-8 flex items-center gap-2.5 md:hidden">
-            <img src="/base.png" alt="logo" className="md:w-50 w-30"/>
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-sm font-bold text-white">B</span>
+            <span className="text-lg font-semibold tracking-tight text-ink">Baseman</span>
           </a>
 
           <AnimatePresence mode="wait">
             {step === 1 ? (
-              /* ---------------- Step 1: choose role ---------------- */
-              <motion.div
-                key="step1"
-                initial={{ opacity: 0, x: 16 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -16 }}
-                transition={{ duration: 0.25 }}
-              >
+              <motion.div key="step1" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.25 }}>
                 <p className="text-xs font-medium uppercase tracking-wide text-brand">Step 1 of 2</p>
                 <h1 className="mt-2 text-2xl font-bold tracking-tight text-ink">How will you use Baseman?</h1>
                 <p className="mt-2 text-sm text-muted">You can always do both later — this just sets up your first experience.</p>
@@ -126,14 +177,7 @@ export default function SignupPage() {
                 </p>
               </motion.div>
             ) : (
-              /* ---------------- Step 2: account details ---------------- */
-              <motion.div
-                key="step2"
-                initial={{ opacity: 0, x: 16 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -16 }}
-                transition={{ duration: 0.25 }}
-              >
+              <motion.div key="step2" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.25 }}>
                 <button onClick={() => setStep(1)} className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink transition-colors">
                   <ArrowLeft className="h-3.5 w-3.5" /> Change role
                 </button>
@@ -146,27 +190,59 @@ export default function SignupPage() {
                   {role === "seeker" ? "Start browsing and get your first match score." : "Start posting and see scored applicants roll in."}
                 </p>
 
-                <form className="mt-6 space-y-4">
+                {error && (
+                  <div className="mt-4 flex items-start gap-2 rounded-lg bg-error/10 p-3 text-xs text-error">
+                    <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    {error}
+                  </div>
+                )}
+
+                <form onSubmit={handleSubmit} className="mt-6 space-y-4">
                   {role === "employer" && (
                     <div>
                       <label className="text-xs font-medium text-ink">Company name</label>
-                      <input type="text" placeholder="Acme Inc" className="mt-1.5 w-full rounded-lg border border-border px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand" />
+                      <input
+                        value={companyName}
+                        onChange={(e) => setCompanyName(e.target.value)}
+                        type="text"
+                        placeholder="Acme Inc"
+                        required
+                        className="mt-1.5 w-full rounded-lg border border-border px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand"
+                      />
                     </div>
                   )}
                   <div>
                     <label className="text-xs font-medium text-ink">Full name</label>
-                    <input type="text" placeholder="Jordan Lee" className="mt-1.5 w-full rounded-lg border border-border px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand" />
+                    <input
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      type="text"
+                      placeholder="Jordan Lee"
+                      required
+                      className="mt-1.5 w-full rounded-lg border border-border px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand"
+                    />
                   </div>
                   <div>
                     <label className="text-xs font-medium text-ink">Email</label>
-                    <input type="email" placeholder="you@example.com" className="mt-1.5 w-full rounded-lg border border-border px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand" />
+                    <input
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      type="email"
+                      placeholder="you@example.com"
+                      required
+                      className="mt-1.5 w-full rounded-lg border border-border px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand"
+                    />
                   </div>
                   <div>
                     <label className="text-xs font-medium text-ink">Password</label>
                     <div className="relative mt-1.5">
                       <input
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
                         type={showPassword ? "text" : "password"}
                         placeholder="At least 8 characters"
+                        required
+                        minLength={8}
                         className="w-full rounded-lg border border-border px-3.5 py-2.5 pr-10 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand"
                       />
                       <button
@@ -180,8 +256,12 @@ export default function SignupPage() {
                     </div>
                   </div>
 
-                  <button type="submit" className="w-full rounded-lg bg-brand py-3 text-sm font-medium text-white hover:bg-brand/90 transition-colors">
-                    Create account
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand py-3 text-sm font-medium text-white transition-opacity hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create account"}
                   </button>
                 </form>
 
@@ -191,7 +271,7 @@ export default function SignupPage() {
                   <div className="h-px flex-1 bg-border" />
                 </div>
 
-                <button className="w-full rounded-lg border border-border py-3 text-sm font-medium text-ink hover:bg-brand-light transition-colors">
+                <button onClick={handleGoogle} className="w-full rounded-lg border border-border py-3 text-sm font-medium text-ink hover:bg-brand-light transition-colors">
                   Continue with Google
                 </button>
 

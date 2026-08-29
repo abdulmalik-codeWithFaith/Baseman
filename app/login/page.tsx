@@ -1,26 +1,54 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { motion } from "framer-motion";
-import { Eye, EyeOff, CheckCircle2 } from "lucide-react";
+import { Eye, EyeOff, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    const result = await signIn("credentials", { email, password, redirect: false });
+
+    if (result?.error) {
+      setError("Incorrect email or password.");
+      setLoading(false);
+      return;
+    }
+
+    // We don't know the role client-side without re-fetching the session,
+    // so send everyone to a neutral landing point that itself redirects
+    // by role — simplest fix for now is /dashboard, which middleware will
+    // bounce employer/admin accounts away from if it's the wrong landing.
+    // TODO: fetch the session here and route by role directly instead.
+    router.push("/dashboard");
+    router.refresh();
+  };
 
   return (
     <main className="grid min-h-screen md:grid-cols-2">
-      {/* ---------------- Left: image panel ---------------- */}
       <div className="relative hidden overflow-hidden bg-brand md:block">
         <img
           src="https://images.pexels.com/photos/2422286/pexels-photo-2422286.jpeg?auto=compress&cs=tinysrgb&w=1200&h=1600&dpr=1"
           alt="A job seeker reviewing opportunities with confidence"
           className="h-full w-full object-cover"
         />
-        {/* Photo: Jopwell via Pexels — pexels.com/photo/2422286, free commercial license */}
         <div className="absolute inset-0 bg-gradient-to-t from-brand via-brand/20 to-transparent" />
 
         <a href="/" className="absolute left-8 top-8 flex items-center gap-2.5">
-           <img src="/base.png" alt="logo" className="md:w-50 w-30"/>
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-sm font-bold text-brand">B</span>
+          <span className="text-lg font-semibold tracking-tight text-white">Baseman</span>
         </a>
 
         <div className="absolute bottom-28 left-8 right-8">
@@ -29,12 +57,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-          className="absolute bottom-8 left-8 right-8 rounded-xl bg-white p-4 shadow-xl"
-        >
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }} className="absolute bottom-8 left-8 right-8 rounded-xl bg-white p-4 shadow-xl">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-ink">Senior Frontend Developer</p>
@@ -52,23 +75,33 @@ export default function LoginPage() {
         </motion.div>
       </div>
 
-      {/* ---------------- Right: form panel ---------------- */}
       <div className="flex items-center justify-center px-6 py-16">
         <div className="w-full max-w-sm">
           <a href="/" className="mb-8 flex items-center gap-2.5 md:hidden">
-             <img src="/base.png" alt="logo" className="md:w-50 w-30"/>
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-sm font-bold text-white">B</span>
+            <span className="text-lg font-semibold tracking-tight text-ink">Baseman</span>
           </a>
 
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
             <h1 className="text-2xl font-bold tracking-tight text-ink">Welcome back</h1>
             <p className="mt-2 text-sm text-muted">Log in to see your matches, applications, and listings.</p>
 
-            <form className="mt-6 space-y-4">
+            {error && (
+              <div className="mt-4 flex items-start gap-2 rounded-lg bg-error/10 p-3 text-xs text-error">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="mt-6 space-y-4">
               <div>
                 <label className="text-xs font-medium text-ink">Email</label>
                 <input
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   type="email"
                   placeholder="you@example.com"
+                  required
                   className="mt-1.5 w-full rounded-lg border border-border px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand"
                 />
               </div>
@@ -80,8 +113,11 @@ export default function LoginPage() {
                 </div>
                 <div className="relative mt-1.5">
                   <input
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
+                    required
                     className="w-full rounded-lg border border-border px-3.5 py-2.5 pr-10 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand"
                   />
                   <button
@@ -100,8 +136,12 @@ export default function LoginPage() {
                 Keep me logged in
               </label>
 
-              <button type="submit" className="w-full rounded-lg bg-brand py-3 text-sm font-medium text-white hover:bg-brand/90 transition-colors">
-                Log in
+              <button
+                type="submit"
+                disabled={loading}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand py-3 text-sm font-medium text-white transition-opacity hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Log in"}
               </button>
             </form>
 
@@ -111,7 +151,7 @@ export default function LoginPage() {
               <div className="h-px flex-1 bg-border" />
             </div>
 
-            <button className="w-full rounded-lg border border-border py-3 text-sm font-medium text-ink hover:bg-brand-light transition-colors">
+            <button onClick={() => signIn("google", { callbackUrl: "/dashboard" })} className="w-full rounded-lg border border-border py-3 text-sm font-medium text-ink hover:bg-brand-light transition-colors">
               Continue with Google
             </button>
 

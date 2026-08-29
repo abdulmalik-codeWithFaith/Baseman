@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles,
@@ -14,14 +14,15 @@ import {
   ArrowRight,
   ArrowLeft,
   SlidersHorizontal,
+  AlertCircle,
 } from "lucide-react";
-import { getListingById } from "@/lib/employer-listings";
 
 interface StructuredJob {
   title: string;
   location: string;
-  employment: string;
-  experience: string;
+  remote: "Remote" | "Hybrid" | "On-site";
+  employment: "Full-time" | "Part-time" | "Contract" | "Internship";
+  experience: "Entry" | "Mid" | "Senior";
   salary: string;
   skills: string[];
   description: string;
@@ -30,8 +31,9 @@ interface StructuredJob {
 const EMPTY_JOB: StructuredJob = {
   title: "",
   location: "",
-  employment: "",
-  experience: "",
+  remote: "Remote",
+  employment: "Full-time",
+  experience: "Mid",
   salary: "",
   skills: [],
   description: "",
@@ -40,6 +42,7 @@ const EMPTY_JOB: StructuredJob = {
 const MOCK_STRUCTURED: StructuredJob = {
   title: "Senior Backend Engineer",
   location: "Remote",
+  remote: "Remote",
   employment: "Full-time",
   experience: "Senior",
   salary: "$150k–$180k",
@@ -48,9 +51,28 @@ const MOCK_STRUCTURED: StructuredJob = {
     "We're looking for a senior backend engineer to help scale our core platform, owning services from design through production.",
 };
 
+// UI label <-> Prisma enum value, both directions
+const remoteToEnum: Record<StructuredJob["remote"], string> = { Remote: "REMOTE", Hybrid: "HYBRID", "On-site": "ONSITE" };
+const remoteFromEnum: Record<string, StructuredJob["remote"]> = { REMOTE: "Remote", HYBRID: "Hybrid", ONSITE: "On-site" };
+const employmentToEnum: Record<StructuredJob["employment"], string> = {
+  "Full-time": "FULL_TIME",
+  "Part-time": "PART_TIME",
+  Contract: "CONTRACT",
+  Internship: "INTERNSHIP",
+};
+const employmentFromEnum: Record<string, StructuredJob["employment"]> = {
+  FULL_TIME: "Full-time",
+  PART_TIME: "Part-time",
+  CONTRACT: "Contract",
+  INTERNSHIP: "Internship",
+};
+const experienceToEnum: Record<StructuredJob["experience"], string> = { Entry: "ENTRY", Mid: "MID", Senior: "SENIOR" };
+const experienceFromEnum: Record<string, StructuredJob["experience"]> = { ENTRY: "Entry", MID: "Mid", SENIOR: "Senior" };
+
 type Method = "ai" | "manual" | null;
 
 function PostJobForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");
   const draftId = searchParams.get("draft");
@@ -65,25 +87,31 @@ function PostJobForm() {
   const [threshold, setThreshold] = useState(50);
   const [loadedTitle, setLoadedTitle] = useState<string | null>(null);
 
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   // Load existing listing data when arriving via ?edit= or ?draft=
   useEffect(() => {
     if (!targetId) return;
-    const listing = getListingById(targetId);
-    if (!listing) return;
-
-    setJob({
-      title: listing.title,
-      location: listing.location,
-      employment: listing.employment,
-      experience: listing.experience,
-      salary: listing.salary,
-      skills: listing.skills,
-      description: listing.description,
-    });
-    setAutoReject(listing.autoReject);
-    setThreshold(listing.threshold);
-    setLoadedTitle(listing.title);
-    setMethod("manual"); // skip the method-choice screen, go straight to the form
+    fetch(`/api/jobs/${targetId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data) return;
+        setJob({
+          title: data.title,
+          location: data.location,
+          remote: remoteFromEnum[data.remote] ?? "Remote",
+          employment: employmentFromEnum[data.employment] ?? "Full-time",
+          experience: experienceFromEnum[data.experience] ?? "Mid",
+          salary: data.salary ?? "",
+          skills: data.skills,
+          description: data.description,
+        });
+        setAutoReject(data.autoReject);
+        setThreshold(data.matchThreshold);
+        setLoadedTitle(data.title);
+        setMethod("manual"); // skip the method-choice screen, go straight to the form
+      });
   }, [targetId]);
 
   const showForm = method === "manual" || (method === "ai" && importState === "imported");
@@ -113,12 +141,54 @@ function PostJobForm() {
     setJob(EMPTY_JOB);
   };
 
+  const handlePublish = async () => {
+    setSubmitting(true);
+    setSubmitError(null);
+
+    const payload = {
+      title: job.title,
+      description: job.description,
+      responsibilities: [], // TODO: no field collects these yet — see note below
+      requirements: [], // TODO: same
+      skills: job.skills,
+      location: job.location,
+      remote: remoteToEnum[job.remote],
+      employment: employmentToEnum[job.employment],
+      experience: experienceToEnum[job.experience],
+      salary: job.salary || null,
+      status: "ACTIVE",
+      autoReject,
+      matchThreshold: threshold,
+    };
+
+    try {
+      const res = await fetch(editId ? `/api/jobs/${editId}` : "/api/jobs", {
+        method: editId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setSubmitError(data.error || "Failed to publish this job.");
+        setSubmitting(false);
+        return;
+      }
+
+      router.push("/employers/listings");
+    } catch {
+      setSubmitError("Something went wrong. Please try again.");
+      setSubmitting(false);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-white">
-      <header className="border-b bg-[#134544] border-border">
+      <header className="border-b border-border">
         <nav className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
           <a href="/" className="flex items-center gap-2.5">
-            <img src="/base.png" alt="logo" className="md:w-50 w-30" />
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-sm font-bold text-white">B</span>
+            <span className="text-lg font-semibold tracking-tight text-ink">Baseman</span>
           </a>
           <a href="/employers/listings" className="text-sm font-medium text-muted hover:text-ink transition-colors">Save & exit</a>
         </nav>
@@ -179,6 +249,7 @@ function PostJobForm() {
               <button onClick={handleImport} disabled={!pastedText.trim() || importState === "importing"} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-brand px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-40">
                 {importState === "importing" ? (<><Loader2 className="h-4 w-4 animate-spin" /> Structuring with AI…</>) : (<><Sparkles className="h-4 w-4" /> Import with AI</>)}
               </button>
+              {/* NOTE: this still uses MOCK_STRUCTURED, not a real AI call — that's step 4 (AI service module) */}
             </motion.div>
           )}
 
@@ -197,6 +268,13 @@ function PostJobForm() {
                 </p>
               </div>
 
+              {submitError && (
+                <div className="mt-4 flex items-start gap-2 rounded-lg bg-error/10 p-3 text-xs text-error">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  {submitError}
+                </div>
+              )}
+
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="text-xs font-medium text-ink">Job title</label>
@@ -204,17 +282,47 @@ function PostJobForm() {
                 </div>
                 <div>
                   <label className="text-xs font-medium text-ink">Location</label>
-                  <input value={job.location} onChange={(e) => setJob({ ...job, location: e.target.value })} placeholder="e.g. Remote" className="mt-1.5 w-full rounded-lg border border-border px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand" />
+                  <input value={job.location} onChange={(e) => setJob({ ...job, location: e.target.value })} placeholder="e.g. Austin, TX" className="mt-1.5 w-full rounded-lg border border-border px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand" />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-ink">Remote type</label>
+                  <select
+                    value={job.remote}
+                    onChange={(e) => setJob({ ...job, remote: e.target.value as StructuredJob["remote"] })}
+                    className="mt-1.5 w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                  >
+                    <option>Remote</option>
+                    <option>Hybrid</option>
+                    <option>On-site</option>
+                  </select>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-ink">Employment type</label>
-                  <input value={job.employment} onChange={(e) => setJob({ ...job, employment: e.target.value })} placeholder="e.g. Full-time" className="mt-1.5 w-full rounded-lg border border-border px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand" />
+                  <select
+                    value={job.employment}
+                    onChange={(e) => setJob({ ...job, employment: e.target.value as StructuredJob["employment"] })}
+                    className="mt-1.5 w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                  >
+                    <option>Full-time</option>
+                    <option>Part-time</option>
+                    <option>Contract</option>
+                    <option>Internship</option>
+                  </select>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-ink">Experience level</label>
-                  <input value={job.experience} onChange={(e) => setJob({ ...job, experience: e.target.value })} placeholder="e.g. Senior" className="mt-1.5 w-full rounded-lg border border-border px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand" />
+                  <select
+                    value={job.experience}
+                    onChange={(e) => setJob({ ...job, experience: e.target.value as StructuredJob["experience"] })}
+                    className="mt-1.5 w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+                  >
+                    <option>Entry</option>
+                    <option>Mid</option>
+                    <option>Senior</option>
+                  </select>
                 </div>
-                <div className="sm:col-span-2">
+                <div>
                   <label className="text-xs font-medium text-ink">Salary</label>
                   <input value={job.salary} onChange={(e) => setJob({ ...job, salary: e.target.value })} placeholder="e.g. $150k–$180k" className="mt-1.5 w-full rounded-lg border border-border px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand" />
                 </div>
@@ -238,6 +346,9 @@ function PostJobForm() {
                 <div className="sm:col-span-2">
                   <label className="text-xs font-medium text-ink">Description</label>
                   <textarea value={job.description} onChange={(e) => setJob({ ...job, description: e.target.value })} placeholder="What does this role actually involve?" rows={4} className="mt-1.5 w-full resize-none rounded-lg border border-border px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand" />
+                  <p className="mt-1.5 text-xs text-muted">
+                    Detailed responsibilities and requirements aren't collected in this form yet — this description is all that's stored for now.
+                  </p>
                 </div>
               </div>
 
@@ -279,8 +390,14 @@ function PostJobForm() {
                 </AnimatePresence>
               </div>
 
-              <button className="mt-8 inline-flex items-center gap-2 rounded-lg bg-brand px-6 py-3 text-sm font-medium text-white hover:bg-brand/90 transition-colors">
-                {isEditing ? "Save changes" : "Publish job"} <ArrowRight className="h-4 w-4" />
+              <button
+                onClick={handlePublish}
+                disabled={submitting || !job.title || !job.location}
+                className="mt-8 inline-flex items-center gap-2 rounded-lg bg-brand px-6 py-3 text-sm font-medium text-white transition-opacity hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : (
+                  <>{isEditing ? "Save changes" : "Publish job"} <ArrowRight className="h-4 w-4" /></>
+                )}
               </button>
             </motion.div>
           )}
