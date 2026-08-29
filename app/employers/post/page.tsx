@@ -26,6 +26,7 @@ interface StructuredJob {
   salary: string;
   skills: string[];
   description: string;
+  applicationUrl: string;
 }
 
 const EMPTY_JOB: StructuredJob = {
@@ -37,6 +38,7 @@ const EMPTY_JOB: StructuredJob = {
   salary: "",
   skills: [],
   description: "",
+  applicationUrl: "",
 };
 
 const MOCK_STRUCTURED: StructuredJob = {
@@ -49,6 +51,7 @@ const MOCK_STRUCTURED: StructuredJob = {
   skills: ["Node.js", "PostgreSQL", "AWS"],
   description:
     "We're looking for a senior backend engineer to help scale our core platform, owning services from design through production.",
+  applicationUrl: "",
 };
 
 // UI label <-> Prisma enum value, both directions
@@ -106,6 +109,7 @@ function PostJobForm() {
           salary: data.salary ?? "",
           skills: data.skills,
           description: data.description,
+          applicationUrl: data.applicationUrl ?? "",
         });
         setAutoReject(data.autoReject);
         setThreshold(data.matchThreshold);
@@ -156,6 +160,7 @@ function PostJobForm() {
       employment: employmentToEnum[job.employment],
       experience: experienceToEnum[job.experience],
       salary: job.salary || null,
+      applicationUrl: job.applicationUrl || null,
       status: "ACTIVE",
       autoReject,
       matchThreshold: threshold,
@@ -348,6 +353,21 @@ function PostJobForm() {
                   <textarea value={job.description} onChange={(e) => setJob({ ...job, description: e.target.value })} placeholder="What does this role actually involve?" rows={4} className="mt-1.5 w-full resize-none rounded-lg border border-border px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand" />
                   <p className="mt-1.5 text-xs text-muted">
                     Detailed responsibilities and requirements aren't collected in this form yet — this description is all that's stored for now.
+                  </p>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-medium text-ink">Application URL <span className="font-normal text-muted">(optional)</span></label>
+                  <input
+                    value={job.applicationUrl}
+                    onChange={(e) => setJob({ ...job, applicationUrl: e.target.value })}
+                    type="url"
+                    placeholder="https://yourcompany.com/careers/this-role"
+                    className="mt-1.5 w-full rounded-lg border border-border px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand"
+                  />
+                  <p className="mt-1.5 text-xs text-muted">
+                    If you already have an application page elsewhere, paste it here — applicants will be sent there instead
+                    of applying purely within Baseman. Leave blank to handle applications directly on Baseman.
                   </p>
                 </div>
               </div>

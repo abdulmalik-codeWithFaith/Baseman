@@ -1,7 +1,7 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { getListingById } from "@/lib/employer-listings";
-import { getApplicantsForListing } from "@/lib/applicants";
+import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 import ListingDetailClient from "./listing-detail-client";
 
 interface PageProps {
@@ -10,18 +10,35 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
-  const listing = getListingById(id);
-  if (!listing) return { title: "Listing not found" };
-  return { title: `${listing.title} — Applicants` };
+  const job = await prisma.job.findUnique({ where: { id } });
+  if (!job) return { title: "Listing not found" };
+  return { title: `${job.title} — Applicants` };
 }
 
 export default async function ListingDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const listing = getListingById(id);
+  const session = await auth();
 
-  if (!listing) notFound();
+  if (!session || session.user.role !== "EMPLOYER") {
+    redirect("/login");
+  }
 
-  const applicants = getApplicantsForListing(id);
+  const job = await prisma.job.findUnique({
+    where: { id },
+    include: {
+      company: true,
+      applications: {
+        include: {
+          user: {
+            include: { seekerProfile: true },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      },
+    },
+  });
 
-  return <ListingDetailClient listing={listing} initialApplicants={applicants} />;
+  if (!job || job.company.userId !== session.user.id) notFound();
+
+  return <ListingDetailClient job={job} />;
 }

@@ -201,6 +201,7 @@ model Job {
   employment       EmploymentType
   experience       ExperienceLevel
   salary           String?
+  applicationUrl   String? // optional external link — if set, Apply redirects here instead of applying purely within Baseman
 
   status JobStatus @default(DRAFT)
   views  Int       @default(0)
