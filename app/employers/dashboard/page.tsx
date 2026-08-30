@@ -1,7 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import {
   Briefcase,
   Users,
@@ -10,62 +9,23 @@ import {
   ArrowRight,
   Clock,
   PlusCircle,
+  Loader2,
 } from "lucide-react";
 import NavBar from "@/components/Navbar";
-import EmployerSidebar from "@/components//EmployerSidebar";
+import EmployerSidebar from "@/components/EmployerSidebar";
 
-/* ---------------------------------------------------------------
-   Mock employer data — replace with real queries (by employer
-   account id) once the backend exists.
----------------------------------------------------------------- */
+const statusDisplay: Record<string, string> = {
+  APPLIED: "Applied",
+  INTERVIEW: "Interview",
+  OFFER: "Offer",
+  REJECTED: "Rejected",
+  WITHDRAWN: "Withdrawn",
+  AUTO_DECLINED: "Auto-declined",
+};
 
-interface Listing {
-  id: string;
-  title: string;
-  applicants: number;
-  avgMatch: number;
-  autoReject: boolean;
-  threshold: number;
-  postedDaysAgo: number;
-}
-
-const LISTINGS: Listing[] = [
-  { id: "1", title: "Senior Frontend Developer", applicants: 24, avgMatch: 68, autoReject: true, threshold: 50, postedDaysAgo: 2 },
-  { id: "3", title: "Backend Engineer", applicants: 31, avgMatch: 74, autoReject: true, threshold: 60, postedDaysAgo: 1 },
-  { id: "7", title: "Engineering Manager", applicants: 9, avgMatch: 58, autoReject: false, threshold: 50, postedDaysAgo: 5 },
-  { id: "9", title: "DevOps Engineer", applicants: 15, avgMatch: 71, autoReject: true, threshold: 50, postedDaysAgo: 1 },
-];
-
-interface RawApplicant {
-  name: string;
-  jobId: string;
-  match: number;
-  appliedDaysAgo: number;
-}
-
-const RAW_APPLICANTS: RawApplicant[] = [
-  { name: "A. Rivera", jobId: "1", match: 86, appliedDaysAgo: 1 },
-  { name: "J. Kim", jobId: "1", match: 42, appliedDaysAgo: 1 },
-  { name: "M. Chen", jobId: "3", match: 91, appliedDaysAgo: 1 },
-  { name: "S. Patel", jobId: "3", match: 55, appliedDaysAgo: 2 },
-  { name: "T. Nguyen", jobId: "9", match: 38, appliedDaysAgo: 1 },
-  { name: "R. Cole", jobId: "9", match: 78, appliedDaysAgo: 2 },
-  { name: "D. Okafor", jobId: "7", match: 47, appliedDaysAgo: 3 },
-  { name: "L. Fischer", jobId: "3", match: 68, appliedDaysAgo: 3 },
-];
-
-function statusFor(applicant: RawApplicant, listing: Listing | undefined) {
-  if (!listing) return { label: "Under review", tone: "brand" as const };
-  if (listing.autoReject && applicant.match < listing.threshold) {
-    return { label: "Auto-declined", tone: "muted" as const };
-  }
-  if (applicant.match >= 80) return { label: "Shortlisted", tone: "success" as const };
-  return { label: "Under review", tone: "brand" as const };
-}
-
-function toneClasses(tone: "success" | "muted" | "brand") {
-  if (tone === "success") return { bg: "bg-success/10", text: "text-success" };
-  if (tone === "muted") return { bg: "bg-border", text: "text-muted" };
+function statusTone(status: string) {
+  if (status === "INTERVIEW" || status === "OFFER") return { bg: "bg-success/10", text: "text-success" };
+  if (status === "REJECTED" || status === "WITHDRAWN" || status === "AUTO_DECLINED") return { bg: "bg-border", text: "text-muted" };
   return { bg: "bg-brand-light", text: "text-brand" };
 }
 
@@ -75,19 +35,56 @@ function matchTone(score: number) {
   return { bg: "bg-brand-light", text: "text-brand" };
 }
 
-export default function EmployerDashboardPage() {
-  const applicants = useMemo(
-    () =>
-      RAW_APPLICANTS.map((a) => {
-        const listing = LISTINGS.find((l) => l.id === a.jobId);
-        return { ...a, listing, status: statusFor(a, listing) };
-      }),
-    []
-  );
+function daysAgo(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  return days === 0 ? "Today" : `${days}d ago`;
+}
 
-  const totalApplicants = LISTINGS.reduce((sum, l) => sum + l.applicants, 0);
-  const autoDeclinedCount = applicants.filter((a) => a.status.label === "Auto-declined").length;
-  const avgMatchAcrossListings = Math.round(LISTINGS.reduce((sum, l) => sum + l.avgMatch, 0) / LISTINGS.length);
+interface DashboardData {
+  activeListings: {
+    id: string;
+    title: string;
+    applicants: number;
+    avgMatch: number | null;
+    autoReject: boolean;
+    matchThreshold: number;
+    createdAt: string;
+  }[];
+  totalApplicants: number;
+  autoDeclinedCount: number;
+  avgMatch: number | null;
+  recentApplicants: {
+    id: string;
+    name: string;
+    jobTitle: string;
+    match: number | null;
+    status: string;
+    createdAt: string;
+  }[];
+}
+
+export default function EmployerDashboardPage() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/employer/dashboard")
+      .then((res) => res.json())
+      .then(setData)
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading || !data) {
+    return (
+      <main className="min-h-screen bg-white">
+        <NavBar />
+        <div className="flex items-center justify-center py-24">
+          <Loader2 className="h-5 w-5 animate-spin text-brand" />
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-white">
@@ -111,10 +108,10 @@ export default function EmployerDashboardPage() {
             {/* Stats */}
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
               {[
-                { label: "Active listings", value: LISTINGS.length, icon: Briefcase },
-                { label: "Total applicants", value: totalApplicants, icon: Users },
-                { label: "Avg. match score", value: `${avgMatchAcrossListings}%`, icon: Sparkles },
-                { label: "Auto-declined", value: autoDeclinedCount, icon: UserX },
+                { label: "Active listings", value: data.activeListings.length, icon: Briefcase },
+                { label: "Total applicants", value: data.totalApplicants, icon: Users },
+                { label: "Avg. match score", value: data.avgMatch !== null ? `${data.avgMatch}%` : "—", icon: Sparkles },
+                { label: "Auto-declined", value: data.autoDeclinedCount, icon: UserX },
               ].map((stat) => (
                 <div key={stat.label} className="rounded-xl border border-border p-4">
                   <stat.icon className="h-4 w-4 text-brand" />
@@ -133,7 +130,10 @@ export default function EmployerDashboardPage() {
                 </a>
               </div>
               <div className="mt-4 space-y-3">
-                {LISTINGS.map((listing) => (
+                {data.activeListings.length === 0 && (
+                  <p className="text-sm text-muted">No active listings yet. Post your first job to get started.</p>
+                )}
+                {data.activeListings.map((listing) => (
                   <a
                     key={listing.id}
                     href={`/employers/listings/${listing.id}`}
@@ -143,12 +143,12 @@ export default function EmployerDashboardPage() {
                       <p className="text-sm font-semibold text-ink group-hover:text-brand transition-colors">{listing.title}</p>
                       <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
                         <span className="inline-flex items-center gap-1"><Users className="h-3 w-3" /> {listing.applicants} applicants</span>
-                        <span>Avg. match {listing.avgMatch}%</span>
-                        <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> Posted {listing.postedDaysAgo}d ago</span>
+                        <span>Avg. match {listing.avgMatch !== null ? `${listing.avgMatch}%` : "not scored yet"}</span>
+                        <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> Posted {daysAgo(listing.createdAt)}</span>
                       </div>
                     </div>
                     <span className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-medium ${listing.autoReject ? "bg-brand-light text-brand" : "border border-border text-muted"}`}>
-                      {listing.autoReject ? `Auto-reject below ${listing.threshold}%` : "Auto-reject off"}
+                      {listing.autoReject ? `Auto-reject below ${listing.matchThreshold}%` : "Auto-reject off"}
                     </span>
                   </a>
                 ))}
@@ -158,38 +158,45 @@ export default function EmployerDashboardPage() {
             {/* Recent applicants */}
             <div>
               <h2 className="text-lg font-semibold text-ink">Recent applicants</h2>
-              <div className="mt-4 overflow-hidden rounded-xl border border-border">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-border bg-brand-light/30 text-xs text-muted">
-                      <th className="px-4 py-3 font-medium">Applicant</th>
-                      <th className="px-4 py-3 font-medium">Role</th>
-                      <th className="px-4 py-3 font-medium">Match</th>
-                      <th className="px-4 py-3 font-medium">Status</th>
-                      <th className="px-4 py-3 font-medium">Applied</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {applicants.map((a, i) => {
-                      const mTone = matchTone(a.match);
-                      const sTone = toneClasses(a.status.tone);
-                      return (
-                        <tr key={i} className="border-b border-border last:border-0">
-                          <td className="px-4 py-3 font-medium text-ink">{a.name}</td>
-                          <td className="px-4 py-3 text-muted">{a.listing?.title ?? "—"}</td>
-                          <td className="px-4 py-3">
-                            <span className={`rounded-md px-2 py-1 text-xs font-semibold ${mTone.bg} ${mTone.text}`}>{a.match}%</span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`rounded-md px-2 py-1 text-xs font-semibold ${sTone.bg} ${sTone.text}`}>{a.status.label}</span>
-                          </td>
-                          <td className="px-4 py-3 text-muted">{a.appliedDaysAgo}d ago</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              {data.recentApplicants.length === 0 ? (
+                <p className="mt-4 text-sm text-muted">No applicants yet.</p>
+              ) : (
+                <div className="mt-4 overflow-hidden rounded-xl border border-border">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-brand-light/30 text-xs text-muted">
+                        <th className="px-4 py-3 font-medium">Applicant</th>
+                        <th className="px-4 py-3 font-medium">Role</th>
+                        <th className="px-4 py-3 font-medium">Match</th>
+                        <th className="px-4 py-3 font-medium">Status</th>
+                        <th className="px-4 py-3 font-medium">Applied</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.recentApplicants.map((a) => {
+                        const sTone = statusTone(a.status);
+                        return (
+                          <tr key={a.id} className="border-b border-border last:border-0">
+                            <td className="px-4 py-3 font-medium text-ink">{a.name}</td>
+                            <td className="px-4 py-3 text-muted">{a.jobTitle}</td>
+                            <td className="px-4 py-3">
+                              {a.match !== null ? (
+                                <span className={`rounded-md px-2 py-1 text-xs font-semibold ${matchTone(a.match).bg} ${matchTone(a.match).text}`}>{a.match}%</span>
+                              ) : (
+                                <span className="rounded-md bg-border px-2 py-1 text-xs font-medium text-muted">Not scored</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`rounded-md px-2 py-1 text-xs font-semibold ${sTone.bg} ${sTone.text}`}>{statusDisplay[a.status]}</span>
+                            </td>
+                            <td className="px-4 py-3 text-muted">{daysAgo(a.createdAt)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         </div>
