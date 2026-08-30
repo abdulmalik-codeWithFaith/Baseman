@@ -39,7 +39,7 @@ export default function NavBar() {
   const userEmail = session?.user?.email ?? "";
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-[#134544]">
+    <header className="sticky top-0 z-40 border-b border-border bg-[#134544]/80">
       <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <a href="/" className="flex items-center gap-2.5">
           <img src="/base.png" alt="logo" className="md:w-50 w-30" />

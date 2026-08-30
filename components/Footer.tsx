@@ -16,7 +16,7 @@ export default function Footer(){
                     Know your fit before you apply or post. AI-powered hiring for job
                     seekers and employers.
                 </p>
-                <div className="mt-6 flex items-center gap-3">
+                {/* <div className="mt-6 flex items-center gap-3">
                     <a href="https://twitter.com" aria-label="Baseman on Twitter" className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-white/60 transition-colors hover:text-white">
                     <ChevronRight className="h-4 w-4" />
                     </a>
@@ -26,7 +26,7 @@ export default function Footer(){
                     <a href="https://github.com" aria-label="Baseman on GitHub" className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-white/60 transition-colors hover:text-white">
                     <ChevronRight className="h-4 w-4" />
                     </a>
-                </div>
+                </div> */}
                 </div>
 
                 {/* Product */}
