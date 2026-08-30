@@ -48,11 +48,17 @@ export default async function JobDetailPage({ params }: PageProps) {
   // so the button shows the right state on first load instead of
   // flashing "Apply" before flipping to "Applied".
   let alreadyApplied = false;
+  let alreadySaved = false;
   if (session?.user?.role === "SEEKER") {
     const existing = await prisma.application.findUnique({
       where: { jobId_userId: { jobId: job.id, userId: session.user.id } },
     });
     alreadyApplied = !!existing;
+
+    const savedRecord = await prisma.savedJob.findUnique({
+      where: { userId_jobId: { userId: session.user.id, jobId: job.id } },
+    });
+    alreadySaved = !!savedRecord;
   }
 
   return (
@@ -60,6 +66,7 @@ export default async function JobDetailPage({ params }: PageProps) {
       job={job}
       similarJobs={similarJobs}
       alreadyApplied={alreadyApplied}
+      alreadySaved={alreadySaved}
       isLoggedInSeeker={session?.user?.role === "SEEKER"}
     />
   );

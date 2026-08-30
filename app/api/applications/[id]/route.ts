@@ -22,11 +22,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const isOwner = application.job.company.userId === session.user.id;
+  const isApplicant = application.userId === session.user.id;
   const isAdmin = session.user.role === "ADMIN";
-  if (!isOwner && !isAdmin) {
+  if (!isOwner && !isApplicant && !isAdmin) {
     return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
+  const { status } = await req.json();
+
+  // A job seeker acting on their own application can only withdraw it —
+  // they can't set themselves to Interview/Offer/Rejected.
+  if (isApplicant && !isOwner && !isAdmin) {
+    if (status !== "WITHDRAWN") {
+      return NextResponse.json({ error: "You can only withdraw your own application." }, { status: 403 });
+    }
+    const updated = await prisma.application.update({ where: { id }, data: { status: "WITHDRAWN" } });
+    return NextResponse.json(updated);
+  }
+
+  // Employer/admin path — moving an applicant through the hiring pipeline.
   // An employer/admin can't manually override an AUTO_DECLINED status here —
   // that's a job-level threshold decision, not a per-applicant one. They'd
   // need to adjust the job's matchThreshold instead, which recalculates
@@ -38,7 +52,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     );
   }
 
-  const { status } = await req.json();
   const allowed = ["APPLIED", "INTERVIEW", "OFFER", "REJECTED"];
   if (!allowed.includes(status)) {
     return NextResponse.json({ error: "Invalid status." }, { status: 400 });

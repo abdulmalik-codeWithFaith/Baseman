@@ -2,6 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 
+// GET /api/applications — every application belonging to the signed-in
+// job seeker, powers /applications (their tracker page).
+export async function GET() {
+  const session = await auth();
+  if (!session || session.user.role !== "SEEKER") {
+    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
+  }
+
+  const applications = await prisma.application.findMany({
+    where: { userId: session.user.id },
+    include: {
+      job: { include: { company: { select: { name: true } } } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return NextResponse.json(applications);
+}
+
 // POST /api/applications — a job seeker applying to a job.
 // Powers the "Apply" button on /jobs/[id].
 export async function POST(req: NextRequest) {
