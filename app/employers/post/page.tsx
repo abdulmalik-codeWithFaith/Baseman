@@ -41,19 +41,6 @@ const EMPTY_JOB: StructuredJob = {
   applicationUrl: "",
 };
 
-const MOCK_STRUCTURED: StructuredJob = {
-  title: "Senior Backend Engineer",
-  location: "Remote",
-  remote: "Remote",
-  employment: "Full-time",
-  experience: "Senior",
-  salary: "$150k–$180k",
-  skills: ["Node.js", "PostgreSQL", "AWS"],
-  description:
-    "We're looking for a senior backend engineer to help scale our core platform, owning services from design through production.",
-  applicationUrl: "",
-};
-
 // UI label <-> Prisma enum value, both directions
 const remoteToEnum: Record<StructuredJob["remote"], string> = { Remote: "REMOTE", Hybrid: "HYBRID", "On-site": "ONSITE" };
 const remoteFromEnum: Record<string, StructuredJob["remote"]> = { REMOTE: "Remote", HYBRID: "Hybrid", ONSITE: "On-site" };
@@ -84,6 +71,7 @@ function PostJobForm() {
   const [method, setMethod] = useState<Method>(null);
   const [pastedText, setPastedText] = useState("");
   const [importState, setImportState] = useState<"idle" | "importing" | "imported">("idle");
+  const [importError, setImportError] = useState<string | null>(null);
   const [job, setJob] = useState<StructuredJob>(EMPTY_JOB);
   const [skillInput, setSkillInput] = useState("");
   const [autoReject, setAutoReject] = useState(false);
@@ -130,12 +118,39 @@ function PostJobForm() {
     setSkillInput("");
   };
 
-  const handleImport = () => {
+  const handleImport = async () => {
     setImportState("importing");
-    setTimeout(() => {
-      setJob(MOCK_STRUCTURED);
+    setImportError(null);
+    try {
+      const res = await fetch("/api/ai/parse-job", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: pastedText }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setImportError(data.error || "Couldn't parse this job description.");
+        setImportState("idle");
+        return;
+      }
+
+      setJob({
+        title: data.title,
+        location: data.location,
+        remote: remoteFromEnum[data.remote] ?? "Remote",
+        employment: employmentFromEnum[data.employment] ?? "Full-time",
+        experience: experienceFromEnum[data.experience] ?? "Mid",
+        salary: data.salary ?? "",
+        skills: data.skills ?? [],
+        description: data.description ?? "",
+        applicationUrl: "",
+      });
       setImportState("imported");
-    }, 1200);
+    } catch {
+      setImportError("Something went wrong. Try again, or fill it in manually instead.");
+      setImportState("idle");
+    }
   };
 
   const resetMethod = () => {
@@ -251,10 +266,15 @@ function PostJobForm() {
                 rows={7}
                 className="mt-5 w-full resize-none rounded-xl border border-border p-4 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand"
               />
+              {importError && (
+                <div className="mt-3 flex items-start gap-2 rounded-lg bg-error/10 p-3 text-xs text-error">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {importError}
+                </div>
+              )}
               <button onClick={handleImport} disabled={!pastedText.trim() || importState === "importing"} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-brand px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-40">
                 {importState === "importing" ? (<><Loader2 className="h-4 w-4 animate-spin" /> Structuring with AI…</>) : (<><Sparkles className="h-4 w-4" /> Import with AI</>)}
               </button>
-              {/* NOTE: this still uses MOCK_STRUCTURED, not a real AI call — that's step 4 (AI service module) */}
+              {/* Real AI call now — /api/ai/parse-job via OpenRouter */}
             </motion.div>
           )}
 

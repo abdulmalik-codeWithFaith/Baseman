@@ -16,7 +16,6 @@ import {
   AlertCircle,
   ExternalLink,
 } from "lucide-react";
-import NavBar from "@/components/Navbar";
 
 interface JobWithCompany {
   id: string;
@@ -84,6 +83,35 @@ export default function JobDetailClient({
   const [applyError, setApplyError] = useState<string | null>(null);
   const [saved, setSaved] = useState(alreadySaved);
   const [savingBookmark, setSavingBookmark] = useState(false);
+  const [matchResult, setMatchResult] = useState<{ match: number; strengths: string[]; gaps: string[] } | null>(null);
+  const [checkingMatch, setCheckingMatch] = useState(false);
+  const [matchError, setMatchError] = useState<string | null>(null);
+
+  const handleCheckMatch = async () => {
+    setCheckingMatch(true);
+    setMatchError(null);
+
+    try {
+      const res = await fetch("/api/ai/match", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId: job.id }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMatchError(data.error || "Couldn't compute your match.");
+        setCheckingMatch(false);
+        return;
+      }
+
+      setMatchResult(data);
+    } catch {
+      setMatchError("Something went wrong. Try again.");
+    } finally {
+      setCheckingMatch(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!isLoggedInSeeker) {
@@ -148,7 +176,23 @@ export default function JobDetailClient({
 
   return (
     <main className="min-h-screen bg-white">
-      <NavBar/>
+      <header className="border-b border-border">
+        <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+          <a href="/" className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-sm font-bold text-white">B</span>
+            <span className="text-lg font-semibold tracking-tight text-ink">Baseman</span>
+          </a>
+          <div className="hidden items-center gap-8 text-sm md:flex">
+            <a href="/jobs" className="font-medium text-ink">Jobs</a>
+            <a href="/#how-it-works" className="text-muted hover:text-ink transition-colors">How it works</a>
+            <a href="/employers" className="text-muted hover:text-ink transition-colors">For employers</a>
+          </div>
+          <div className="flex items-center gap-3">
+            <a href="/login" className="text-sm font-medium text-ink hover:text-brand transition-colors">Log in</a>
+            <a href="/signup" className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand/90 transition-colors">Sign up</a>
+          </div>
+        </nav>
+      </header>
 
       <div className="mx-auto max-w-6xl px-6 py-8">
         <a href="/jobs" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-ink transition-colors">
@@ -262,21 +306,61 @@ export default function JobDetailClient({
 
           {/* Sidebar */}
           <div className="space-y-5">
-            {/* AI Match — honest placeholder until the matching service exists */}
-            <div className="rounded-xl border border-border p-5 text-center">
-              <p className="text-sm font-medium text-ink">See your match score</p>
-              <p className="mt-1 text-xs leading-relaxed text-muted">
-                {isLoggedInSeeker
-                  ? "Complete your profile to see how well you fit this role."
-                  : "Log in to see how well you fit this role."}
-              </p>
-              <a
-                href={isLoggedInSeeker ? "/settings" : "/login"}
-                className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2.5 text-sm font-medium text-white hover:bg-brand/90 transition-colors"
-              >
-                {isLoggedInSeeker ? "Complete profile" : "Log in"} <ArrowRight className="h-3.5 w-3.5" />
-              </a>
-            </div>
+            {/* AI Match — now a real call to /api/ai/match */}
+            {matchResult ? (
+              <div className="overflow-hidden rounded-xl border border-border">
+                <div className="bg-brand p-5 text-white">
+                  <p className="text-xs font-medium uppercase tracking-wide text-white/60">AI Match</p>
+                  <p className="mt-1 text-4xl font-bold">{matchResult.match}%</p>
+                  <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/20">
+                    <div className="h-full rounded-full bg-white transition-all duration-700" style={{ width: `${matchResult.match}%` }} />
+                  </div>
+                </div>
+                <div className="space-y-4 p-5">
+                  {matchResult.strengths.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted">Strong matches</p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {matchResult.strengths.map((s) => (
+                          <span key={s} className="inline-flex items-center gap-1 rounded-md bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success"><CheckCircle2 className="h-3 w-3" /> {s}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {matchResult.gaps.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted">Gaps</p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {matchResult.gaps.map((g) => (
+                          <span key={g} className="inline-flex items-center gap-1 rounded-md bg-warning/10 px-2 py-0.5 text-[11px] font-medium text-warning"><AlertCircle className="h-3 w-3" /> {g}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-border p-5 text-center">
+                <p className="text-sm font-medium text-ink">See your match score</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted">
+                  {isLoggedInSeeker ? "AI compares your profile against this job's requirements." : "Log in to see how well you fit this role."}
+                </p>
+                {matchError && <p className="mt-2 text-xs text-error">{matchError}</p>}
+                {isLoggedInSeeker ? (
+                  <button
+                    onClick={handleCheckMatch}
+                    disabled={checkingMatch}
+                    className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2.5 text-sm font-medium text-white transition-opacity hover:bg-brand/90 disabled:opacity-60"
+                  >
+                    {checkingMatch ? <Loader2 className="h-4 w-4 animate-spin" /> : (<>Check my match <ArrowRight className="h-3.5 w-3.5" /></>)}
+                  </button>
+                ) : (
+                  <a href={`/login?callbackUrl=/jobs/${job.id}`} className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2.5 text-sm font-medium text-white hover:bg-brand/90 transition-colors">
+                    Log in <ArrowRight className="h-3.5 w-3.5" />
+                  </a>
+                )}
+              </div>
+            )}
 
             <div className="rounded-xl border border-border p-5">
               <p className="text-xs font-medium uppercase tracking-wide text-muted">About {job.company.name}</p>
