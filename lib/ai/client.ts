@@ -1,6 +1,13 @@
+/* ---------------------------------------------------------------
+   Shared OpenRouter client. Defaults to "openrouter/free", which
+   auto-routes to whatever model is currently free — individual
+   :free model IDs on OpenRouter rotate out fairly often, so
+   pointing at a specific one risks it silently disappearing later.
+   Override OPENROUTER_MODEL in .env for a specific (paid) model
+   once you want more consistent quality than the free tier.
+---------------------------------------------------------------- */
 
-
-const AGENTROUTER_URL = "https://agentrouter.org";
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 interface UsageInfo {
   prompt_tokens: number;
@@ -20,19 +27,22 @@ export interface AiResult {
 }
 
 export async function callAi(systemPrompt: string, userPrompt: string): Promise<AiResult> {
-  const apiKey = process.env.AGENTROUTER_API_KEY;
+  const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
-    throw new Error("AGENTROUTER_API_KEY is not set.");
+    throw new Error("OPENROUTER_API_KEY is not set.");
   }
 
-  const res = await fetch(AGENTROUTER_URL, {
+  const res = await fetch(OPENROUTER_URL, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
+      // Optional but recommended by OpenRouter for their own leaderboard/analytics
+      "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+      "X-Title": "Baseman",
     },
     body: JSON.stringify({
-      model: process.env.AGENTROUTER_MODEL || "claude-sonnet-4-5-20250929",
+      model: process.env.OPENROUTER_MODEL || "openrouter/free",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
@@ -43,10 +53,19 @@ export async function callAi(systemPrompt: string, userPrompt: string): Promise<
 
   if (!res.ok) {
     const errText = await res.text();
-    throw new Error(`AgentRouter error ${res.status}: ${errText}`);
+    throw new Error(`OpenRouter error ${res.status}: ${errText}`);
   }
 
-  const data: ChatCompletionResponse = await res.json();
+  const rawText = await res.text();
+  let data: ChatCompletionResponse;
+  try {
+    data = JSON.parse(rawText);
+  } catch {
+    throw new Error(
+      `OpenRouter returned a non-JSON response (status ${res.status}). First 200 chars: ${rawText.slice(0, 200)}`
+    );
+  }
+
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error("No content returned from the model.");
 
