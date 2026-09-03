@@ -20,19 +20,26 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   return NextResponse.json(job);
 }
 
-// PATCH /api/jobs/[id] — edit a listing (employer, own listing only)
-// or update status (e.g. Active <-> Closed from /employers/listings).
+// PATCH /api/jobs/[id] — edit a listing (employer editing their own,
+// or admin editing any listing) or update status (e.g. Active <-> Closed
+// from /employers/listings).
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
-  if (!session || session.user.role !== "EMPLOYER") {
+  if (!session || (session.user.role !== "EMPLOYER" && session.user.role !== "ADMIN")) {
     return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
   const { id } = await params;
   const job = await prisma.job.findUnique({ where: { id }, include: { company: true } });
 
-  if (!job || job.company.userId !== session.user.id) {
+  if (!job) {
     return NextResponse.json({ error: "Job not found." }, { status: 404 });
+  }
+
+  const isOwner = job.company.userId === session.user.id;
+  const isAdmin = session.user.role === "ADMIN";
+  if (!isOwner && !isAdmin) {
+    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
   const body = await req.json();

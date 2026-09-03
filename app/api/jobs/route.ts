@@ -38,21 +38,32 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(jobs);
 }
 
-// POST /api/jobs — create a job listing (employer only).
-// Used by the /employers/post flow, both "Paste with AI" (after parsing)
-// and "Fill in manually".
+// POST /api/jobs — create a job listing.
+// Employers create under their own company automatically. Admins can
+// create a listing on behalf of ANY company, since admin isn't tied
+// to one the way an employer is — they must pass companyId explicitly.
 export async function POST(req: NextRequest) {
   const session = await auth();
-  if (!session || session.user.role !== "EMPLOYER") {
+  if (!session || (session.user.role !== "EMPLOYER" && session.user.role !== "ADMIN")) {
     return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
-  const company = await prisma.company.findUnique({ where: { userId: session.user.id } });
-  if (!company) {
-    return NextResponse.json({ error: "No company profile found for this account." }, { status: 400 });
+  const body = await req.json();
+
+  let companyId: string;
+  if (session.user.role === "ADMIN") {
+    if (!body.companyId) {
+      return NextResponse.json({ error: "companyId is required when posting as admin." }, { status: 400 });
+    }
+    companyId = body.companyId;
+  } else {
+    const company = await prisma.company.findUnique({ where: { userId: session.user.id } });
+    if (!company) {
+      return NextResponse.json({ error: "No company profile found for this account." }, { status: 400 });
+    }
+    companyId = company.id;
   }
 
-  const body = await req.json();
   const {
     title,
     description,
@@ -64,6 +75,7 @@ export async function POST(req: NextRequest) {
     employment,
     experience,
     salary,
+    applicationUrl,
     status = "DRAFT",
     autoReject = false,
     matchThreshold = 50,
@@ -75,7 +87,7 @@ export async function POST(req: NextRequest) {
 
   const job = await prisma.job.create({
     data: {
-      companyId: company.id,
+      companyId,
       title,
       description: description || "",
       responsibilities,
@@ -86,6 +98,7 @@ export async function POST(req: NextRequest) {
       employment,
       experience,
       salary,
+      applicationUrl,
       status,
       autoReject,
       matchThreshold,

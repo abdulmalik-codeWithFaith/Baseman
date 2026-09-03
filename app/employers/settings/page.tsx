@@ -57,6 +57,31 @@ export default function EmployerSettingsPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLogoUploading(true);
+    setLogoError(null);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("/api/upload/logo", { method: "POST", body: formData });
+    const data = await res.json();
+    setLogoUploading(false);
+
+    if (!res.ok) {
+      setLogoError(data.error || "Upload failed. Try again.");
+      return;
+    }
+
+    setCompany((c) => ({ ...c, logoUrl: data.logoUrl }));
+  };
+
   const handleSaveCompany = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -188,11 +213,20 @@ export default function EmployerSettingsPage() {
                   <motion.form key="company" onSubmit={handleSaveCompany} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }} className="mt-8 space-y-6">
                     <div className="flex items-center gap-4">
                       <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl bg-brand-light text-brand">
-                        <Building2 className="h-6 w-6" />
+                        {company.logoUrl ? (
+                          <img src={company.logoUrl} alt="Company logo" className="h-full w-full object-cover" />
+                        ) : (
+                          <Building2 className="h-6 w-6" />
+                        )}
                       </div>
                       <div>
                         <p className="text-sm font-medium text-ink">Company logo</p>
-                        <p className="text-xs text-muted">Logo upload needs file storage — not wired up yet.</p>
+                        <p className="text-xs text-muted">Shown on your listings and public company page.</p>
+                        <label className="mt-2 inline-block cursor-pointer text-xs font-medium text-brand hover:underline">
+                          {logoUploading ? "Uploading…" : company.logoUrl ? "Replace logo" : "Upload logo"}
+                          <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogoUpload} disabled={logoUploading} className="hidden" />
+                        </label>
+                        {logoError && <p className="mt-1 text-xs text-error">{logoError}</p>}
                       </div>
                     </div>
 

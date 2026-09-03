@@ -16,6 +16,7 @@ import {
   AlertCircle,
   ExternalLink,
 } from "lucide-react";
+import NavBar from "@/components/Navbar";
 
 interface JobWithCompany {
   id: string;
@@ -176,23 +177,7 @@ export default function JobDetailClient({
 
   return (
     <main className="min-h-screen bg-white">
-      <header className="border-b border-border">
-        <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <a href="/" className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-sm font-bold text-white">B</span>
-            <span className="text-lg font-semibold tracking-tight text-ink">Baseman</span>
-          </a>
-          <div className="hidden items-center gap-8 text-sm md:flex">
-            <a href="/jobs" className="font-medium text-ink">Jobs</a>
-            <a href="/#how-it-works" className="text-muted hover:text-ink transition-colors">How it works</a>
-            <a href="/employers" className="text-muted hover:text-ink transition-colors">For employers</a>
-          </div>
-          <div className="flex items-center gap-3">
-            <a href="/login" className="text-sm font-medium text-ink hover:text-brand transition-colors">Log in</a>
-            <a href="/signup" className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand/90 transition-colors">Sign up</a>
-          </div>
-        </nav>
-      </header>
+      <NavBar />
 
       <div className="mx-auto max-w-6xl px-6 py-8">
         <a href="/jobs" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-ink transition-colors">

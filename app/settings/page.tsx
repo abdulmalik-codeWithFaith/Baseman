@@ -173,6 +173,32 @@ export default function SettingsPage() {
     setTimeout(() => setPasswordSaved(false), 2500);
   };
 
+  /* ---------------- Resume upload ---------------- */
+  const [uploadingResume, setUploadingResume] = useState(false);
+  const [resumeError, setResumeError] = useState<string | null>(null);
+
+  const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingResume(true);
+    setResumeError(null);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("/api/upload/resume", { method: "POST", body: formData });
+    const data = await res.json();
+    setUploadingResume(false);
+
+    if (!res.ok) {
+      setResumeError(data.error || "Upload failed. Try again.");
+      return;
+    }
+
+    setProfile((p) => ({ ...p, resumeUrl: data.resumeUrl, resumeFileName: data.resumeFileName }));
+  };
+
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleteText, setDeleteText] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -335,19 +361,25 @@ export default function SettingsPage() {
                             <p className="text-xs text-muted">Used for AI matching and resume tailoring</p>
                           </div>
                         </div>
+                        <label className="cursor-pointer rounded-lg border border-border px-3.5 py-2 text-xs font-medium text-ink hover:bg-brand-light transition-colors">
+                          {uploadingResume ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Replace"}
+                          <input type="file" accept=".pdf,.doc,.docx" onChange={handleResumeUpload} disabled={uploadingResume} className="hidden" />
+                        </label>
                       </div>
                     ) : (
-                      <div className="rounded-xl border border-dashed border-border p-8 text-center">
-                        <FileText className="mx-auto h-6 w-6 text-muted" />
-                        <p className="mt-3 text-sm font-medium text-ink">No resume uploaded yet</p>
-                      </div>
+                      <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border p-8 text-center hover:bg-brand-light/30 transition-colors">
+                        {uploadingResume ? <Loader2 className="h-5 w-5 animate-spin text-brand" /> : <Upload className="h-5 w-5 text-muted" />}
+                        <p className="text-sm font-medium text-ink">{uploadingResume ? "Uploading…" : "Upload your resume"}</p>
+                        <p className="text-xs text-muted">PDF or Word, up to 10MB</p>
+                        <input type="file" accept=".pdf,.doc,.docx" onChange={handleResumeUpload} disabled={uploadingResume} className="hidden" />
+                      </label>
                     )}
 
-                    <div className="flex cursor-not-allowed flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border p-8 text-center opacity-60">
-                      <Upload className="h-5 w-5 text-muted" />
-                      <p className="text-sm font-medium text-ink">Resume upload isn't wired up yet</p>
-                      <p className="text-xs text-muted">This needs file storage (Cloudinary) — a separate setup step.</p>
-                    </div>
+                    {resumeError && (
+                      <div className="flex items-start gap-2 rounded-lg bg-error/10 p-3 text-xs text-error">
+                        <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {resumeError}
+                      </div>
+                    )}
 
                     <div className="rounded-lg bg-brand-light p-3 text-xs leading-relaxed text-ink">
                       Baseman only reorganizes and clarifies what's already on your resume for a

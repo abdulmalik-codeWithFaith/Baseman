@@ -1,11 +1,12 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Briefcase, Users, ClipboardList, Sparkles } from "lucide-react";
+import { LayoutDashboard, Briefcase, Users, ClipboardList, Sparkles, PlusCircle } from "lucide-react";
 
 const links = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/jobs", label: "Jobs", icon: Briefcase },
+  { href: "/admin/jobs/post", label: "Post a Job", icon: PlusCircle },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/applications", label: "Applications", icon: ClipboardList },
   { href: "/admin/ai-usage", label: "AI Usage", icon: Sparkles },
