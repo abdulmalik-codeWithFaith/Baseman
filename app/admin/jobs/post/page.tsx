@@ -56,8 +56,15 @@ type Method = "ai" | "manual" | null;
 export default function AdminPostJobPage() {
   const router = useRouter();
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
-  const [companyId, setCompanyId] = useState("");
-  const [loadingCompanies, setLoadingCompanies] = useState(true);
+  const [companyName, setCompanyName] = useState("");
+  const [showCompanyDetails, setShowCompanyDetails] = useState(false);
+  const [companyDetails, setCompanyDetails] = useState({
+    industry: "",
+    size: "",
+    website: "",
+    headquarters: "",
+    description: "",
+  });
 
   const [method, setMethod] = useState<Method>(null);
   const [pastedText, setPastedText] = useState("");
@@ -71,11 +78,8 @@ export default function AdminPostJobPage() {
   useEffect(() => {
     fetch("/api/admin/companies")
       .then((res) => res.json())
-      .then((data) => {
-        setCompanies(data);
-        if (data.length > 0) setCompanyId(data[0].id);
-      })
-      .finally(() => setLoadingCompanies(false));
+      .then(setCompanies)
+      .catch(() => {});
   }, []);
 
   const showForm = method === "manual" || (method === "ai" && importState === "imported");
@@ -132,7 +136,8 @@ export default function AdminPostJobPage() {
     setSubmitError(null);
 
     const payload = {
-      companyId,
+      companyName,
+      companyDetails: showCompanyDetails ? companyDetails : undefined,
       title: job.title,
       description: job.description,
       responsibilities: [],
@@ -189,30 +194,50 @@ export default function AdminPostJobPage() {
             <h1 className="text-2xl font-bold tracking-tight text-ink">Post a job (as admin)</h1>
             <p className="mt-2 text-sm text-muted">Create a listing on behalf of any company on the platform.</p>
 
-            {/* Company picker — admin isn't tied to one company */}
+            {/* Company — type freely, suggestions from existing companies via datalist */}
             <div className="mt-6">
               <label className="text-xs font-medium text-ink">Company</label>
-              {loadingCompanies ? (
-                <div className="mt-1.5 flex items-center gap-2 text-sm text-muted">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Loading companies…
-                </div>
-              ) : companies.length === 0 ? (
-                <p className="mt-1.5 text-sm text-muted">No companies exist yet — an employer needs to sign up first.</p>
-              ) : (
-                <select
-                  value={companyId}
-                  onChange={(e) => setCompanyId(e.target.value)}
-                  className="mt-1.5 w-full max-w-sm rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-brand"
+              <input
+                list="existing-companies"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                placeholder="Type a company name — new or existing"
+                className="mt-1.5 w-full max-w-sm rounded-lg border border-border px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand"
+              />
+              <datalist id="existing-companies">
+                {companies.map((c) => (
+                  <option key={c.id} value={c.name} />
+                ))}
+              </datalist>
+              <p className="mt-1.5 text-xs text-muted">
+                Matches an existing company by name if one exists, otherwise creates a new one.
+              </p>
+
+              {!showCompanyDetails ? (
+                <button
+                  onClick={() => setShowCompanyDetails(true)}
+                  className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:underline"
                 >
-                  {companies.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+                  <Plus className="h-3.5 w-3.5" /> Add company details
+                </button>
+              ) : (
+                <div className="mt-4 grid gap-3 rounded-lg border border-border p-4 sm:grid-cols-2">
+                  <p className="text-xs text-muted sm:col-span-2">
+                    Only used if this creates a <span className="font-medium text-ink">new</span> company — won't overwrite an existing one's saved profile.
+                  </p>
+                  <input value={companyDetails.industry} onChange={(e) => setCompanyDetails({ ...companyDetails, industry: e.target.value })} placeholder="Industry" className="rounded-lg border border-border px-3 py-2 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand" />
+                  <input value={companyDetails.size} onChange={(e) => setCompanyDetails({ ...companyDetails, size: e.target.value })} placeholder="Company size" className="rounded-lg border border-border px-3 py-2 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand" />
+                  <input value={companyDetails.website} onChange={(e) => setCompanyDetails({ ...companyDetails, website: e.target.value })} placeholder="Website" className="rounded-lg border border-border px-3 py-2 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand" />
+                  <input value={companyDetails.headquarters} onChange={(e) => setCompanyDetails({ ...companyDetails, headquarters: e.target.value })} placeholder="Headquarters" className="rounded-lg border border-border px-3 py-2 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand" />
+                  <textarea value={companyDetails.description} onChange={(e) => setCompanyDetails({ ...companyDetails, description: e.target.value })} placeholder="Short description" rows={2} className="resize-none rounded-lg border border-border px-3 py-2 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand sm:col-span-2" />
+                  <button onClick={() => setShowCompanyDetails(false)} className="text-left text-xs font-medium text-muted hover:text-ink sm:col-span-2">
+                    Remove details
+                  </button>
+                </div>
               )}
             </div>
 
-            {companies.length > 0 && (
-              <div className="mt-8 border-t border-border pt-8">
+            <div className="mt-8 border-t border-border pt-8">
                 <AnimatePresence mode="wait">
                   {method === null && (
                     <motion.div key="choose" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.25 }}>
@@ -319,7 +344,6 @@ export default function AdminPostJobPage() {
                   )}
                 </AnimatePresence>
               </div>
-            )}
           </div>
         </div>
       </div>

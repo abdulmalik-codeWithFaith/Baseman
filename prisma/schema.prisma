@@ -168,9 +168,9 @@ model SeekerProfile {
 // =================================================================
 
 model Company {
-  id     String @id @default(cuid())
-  userId String @unique // the employer account that owns this company
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String  @id @default(cuid())
+  userId String? @unique // optional — admin-created companies may have no linked employer account yet
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   name         String
   logoUrl      String? // Cloudinary URL

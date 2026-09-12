@@ -52,10 +52,31 @@ export async function POST(req: NextRequest) {
 
   let companyId: string;
   if (session.user.role === "ADMIN") {
-    if (!body.companyId) {
-      return NextResponse.json({ error: "companyId is required when posting as admin." }, { status: 400 });
+    const { companyName, companyDetails } = body;
+    if (!companyName || !companyName.trim()) {
+      return NextResponse.json({ error: "Company name is required." }, { status: 400 });
     }
-    companyId = body.companyId;
+
+    const existing = await prisma.company.findFirst({
+      where: { name: { equals: companyName.trim(), mode: "insensitive" } },
+    });
+
+    if (existing) {
+      companyId = existing.id;
+    } else {
+      const created = await prisma.company.create({
+        data: {
+          name: companyName.trim(),
+          industry: companyDetails?.industry || null,
+          size: companyDetails?.size || null,
+          website: companyDetails?.website || null,
+          headquarters: companyDetails?.headquarters || null,
+          description: companyDetails?.description || null,
+          // userId intentionally omitted — standalone company, no employer account yet
+        },
+      });
+      companyId = created.id;
+    }
   } else {
     const company = await prisma.company.findUnique({ where: { userId: session.user.id } });
     if (!company) {
