@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { signIn, getSession } from "next-auth/react";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 
@@ -27,12 +27,16 @@ export default function LoginPage() {
       return;
     }
 
-    // We don't know the role client-side without re-fetching the session,
-    // so send everyone to a neutral landing point that itself redirects
-    // by role — simplest fix for now is /dashboard, which middleware will
-    // bounce employer/admin accounts away from if it's the wrong landing.
-    // TODO: fetch the session here and route by role directly instead.
-    router.push("/dashboard");
+    // Fetch the real session now that we're signed in, so we can route
+    // by actual role instead of guessing — this replaces the old
+    // "always send to /dashboard" placeholder.
+    const session = await getSession();
+    const role = session?.user?.role;
+
+    if (role === "ADMIN") router.push("/admin/dashboard");
+    else if (role === "EMPLOYER") router.push("/employers/dashboard");
+    else router.push("/dashboard");
+
     router.refresh();
   };
 
